@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Main-Class: unitcreator.install.UnitCreatorInstaller
+Premain-Class: unitcreator.agent.UnitCreatorAgent
+Agent-Class: unitcreator.agent.UnitCreatorAgent
+Can-Redefine-Classes: true
+Can-Retransform-Classes: true
+Implementation-Title: Unit Creator for BCU

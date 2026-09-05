@@ -1,0 +1,19 @@
+# build output
+/out/
+*.class
+
+# a BCU jar dropped here as a compile reference
+/bcu/
+BCU*.jar
+*.unitcreator-backup
+
+# installer runtime files
+install.log
+unit-creator.log
+
+# editors and OS
+.idea/
+.vscode/
+*.iml
+Thumbs.db
+desktop.ini
