@@ -33,6 +33,14 @@ Your BCU jar is never touched. Unit Creator is attached while the game is runnin
 gone the moment you launch BCU normally again. Deleting the folder removes it completely,
 and a BCU update cannot break it, because nothing was installed in the first place.
 
+### Running alongside other BCU patches
+
+Some patches share a launcher called `BCU New Features.bat`, which starts BCU with every
+registered feature at once. Run `Add to BCU New Features.bat` to join it, and use that
+launcher from then on. The jar still is not modified, and
+`Remove from BCU New Features.bat` takes Unit Creator back out without touching anything
+else that is registered.
+
 ### 2. Install into the jar (fallback)
 
 If the launcher does not suit you, or you would rather keep using your own shortcut, run

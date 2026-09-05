@@ -28,6 +28,12 @@ public final class UnitCreatorInstaller {
     private static final String BACKUP_SUFFIX = ".unitcreator-backup";
     private static final String OWNED_PREFIX = "unitcreator/";
 
+    private static final String FEATURE_DIR = "bcu-features";
+    private static final String REGISTRATION = "200-unit-creator.jvmargs";
+    private static final String LAUNCHER = "BCU New Features.bat";
+    private static final String HIDDEN = "BCU New Features (No Console).vbs";
+    private static final String AGENT = "unit-creator.jar";
+
     private static final String INSTALLER_PREFIX = "unitcreator/install/";
     private static final String TRANSFORM_PREFIX = "unitcreator/transform/";
     private static final String AGENT_PREFIX = "unitcreator/agent/";
@@ -39,15 +45,38 @@ public final class UnitCreatorInstaller {
                             .getAbsolutePath());
         try {
             boolean uninstall = false;
+            boolean register = false;
+            boolean unregister = false;
             String path = null;
             for (String a : args) {
                 if (a.equals("--uninstall") || a.equals("-u")) uninstall = true;
+                else if (a.equals("--register")) register = true;
+                else if (a.equals("--unregister")) unregister = true;
                 else if (!a.startsWith("-")) path = a;
             }
             File bcu = path != null ? new File(path) : autoFindBcu();
+            if (bcu != null) bcu = bcu.getAbsoluteFile();
             if (bcu == null || !bcu.isFile())
                 fail("Could not find the BCU jar. Put this installer folder inside your\n"
                         + "BCU folder, or pass the BCU jar path as an argument.");
+
+            if (register || unregister) {
+                File root = bcu.getParentFile();
+                if (root == null) fail("Could not work out the BCU folder.");
+                if (register) {
+                    String made = register(root);
+                    logLine("registered with the shared launcher in " + root.getName());
+                    success("Unit Creator added to the shared launcher.\n\n"
+                            + "Start BCU with \"" + LAUNCHER + "\" in:\n" + root.getAbsolutePath()
+                            + "\n\nYour BCU jar is not modified." + made);
+                } else {
+                    String gone = unregister(root);
+                    logLine("removed the shared launcher registration in " + root.getName());
+                    success("Unit Creator removed from the shared launcher.\n\n"
+                            + "Other features registered there are untouched." + gone);
+                }
+                return;
+            }
 
             if (uninstall) {
                 if (!jarHasEntry(bcu, MARKER)) {
@@ -341,6 +370,113 @@ public final class UnitCreatorInstaller {
             w.close();
         } catch (Throwable ignored) {
         }
+    }
+
+private static String register(File root) throws Exception {
+        File features = new File(root, FEATURE_DIR);
+        if (!features.isDirectory() && !features.mkdirs())
+            throw new InstallError("Could not create:\n" + features.getAbsolutePath());
+
+        String module = moduleDir(root);
+        StringBuilder reg = new StringBuilder();
+        reg.append("# One JVM argument per line. Files are loaded alphabetically.\n");
+        reg.append("\"-Dunitcreator.log=!BCU_ROOT!\\").append(module)
+                .append("\\unit-creator.log\"\n");
+        reg.append("\"-javaagent:!BCU_ROOT!\\").append(module).append("\\")
+                .append(AGENT).append("\"\n");
+        write(new File(features, REGISTRATION), reg.toString());
+
+        StringBuilder note = new StringBuilder();
+        File bat = new File(root, LAUNCHER);
+        if (!bat.isFile()) {
+            write(bat, sharedLauncher());
+            write(new File(root, HIDDEN), hiddenLauncher());
+            note.append("\n\nThe shared launcher was not there yet, so it was created.");
+        } else {
+            note.append("\n\nThe existing shared launcher was left as it is.");
+        }
+        return note.toString();
+    }
+
+    private static String unregister(File root) throws Exception {
+        File features = new File(root, FEATURE_DIR);
+        File mine = new File(features, REGISTRATION);
+        if (!mine.isFile()) return "\n\nThere was no registration to remove.";
+        if (!mine.delete())
+            throw new InstallError("Could not delete:\n" + mine.getAbsolutePath());
+
+        String[] rest = features.list(new java.io.FilenameFilter() {
+            @Override public boolean accept(File dir, String name) {
+                return name.endsWith(".jvmargs");
+            }
+        });
+        if (rest != null && rest.length > 0)
+            return "\n\n" + rest.length + " other feature is still registered, so the"
+                    + "\nshared launcher was kept.";
+
+        new File(root, LAUNCHER).delete();
+        new File(root, HIDDEN).delete();
+        features.delete();
+        return "\n\nNothing else was registered, so the shared launcher was removed too.";
+    }
+
+    private static String moduleDir(File root) {
+        try {
+            File dir = installerDir();
+            if (dir != null && dir.getParentFile() != null
+                    && dir.getParentFile().getCanonicalFile().equals(root.getCanonicalFile()))
+                return dir.getName();
+        } catch (Throwable ignored) {
+        }
+        return "Unit Creator";
+    }
+
+    private static void write(File file, String text) throws Exception {
+        Files.write(file.toPath(), text.replace("\n", "\r\n")
+                .getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String sharedLauncher() {
+        return "@echo off\nsetlocal enabledelayedexpansion\n"
+                + "set \"BCU_ROOT=%~dp0\"\n"
+                + "if \"!BCU_ROOT:~-1!\"==\"\\\" set \"BCU_ROOT=!BCU_ROOT:~0,-1!\"\n"
+                + "set \"FEATURE_DIR=!BCU_ROOT!\\" + FEATURE_DIR + "\"\n"
+                + "set \"FEATURE_ARGS=\"\n"
+                + "if exist \"!FEATURE_DIR!\\*.jvmargs\" for /f \"delims=\" %%g in "
+                + "('dir /b /a-d /on \"!FEATURE_DIR!\\*.jvmargs\"') do (\n"
+                + "  for /f \"usebackq delims=\" %%a in (\"!FEATURE_DIR!\\%%g\") do (\n"
+                + "    set \"ARG=%%a\"\n"
+                + "    if defined ARG if not \"!ARG:~0,1!\"==\"#\" set \"FEATURE_ARGS=!FEATURE_ARGS! !ARG!\"\n"
+                + "  )\n"
+                + ")\n"
+                + "if not defined FEATURE_ARGS (echo [ERROR] No feature registrations found in "
+                + "!FEATURE_DIR!& pause& exit /b 1)\n"
+                + "for /f \"usebackq delims=\" %%f in (`powershell -NoProfile -ExecutionPolicy Bypass "
+                + "-Command \"$d='!BCU_ROOT!'; Get-ChildItem -LiteralPath $d -Filter 'BCU*.jar' "
+                + "^| Where-Object { $_.Name -notmatch 'installer|attack-ld|manual-control|backup|patch' } "
+                + "^| Sort-Object LastWriteTimeUtc -Descending ^| Select-Object -First 1 -ExpandProperty FullName\"`) "
+                + "do set \"BCU_JAR=%%f\"\n"
+                + "if not defined BCU_JAR (echo [ERROR] No BCU jar found in !BCU_ROOT!& pause& exit /b 1)\n"
+                + "cd /d \"!BCU_ROOT!\"\n"
+                + "java !FEATURE_ARGS! -jar \"!BCU_JAR!\" %*\n"
+                + "set \"CODE=!errorlevel!\"\n"
+                + "if not \"!CODE!\"==\"0\" if not defined BCU_FEATURES_HIDDEN pause\n"
+                + "endlocal & exit /b %CODE%\n";
+    }
+
+    private static String hiddenLauncher() {
+        return "Option Explicit\nDim sh, env, fso, root, runFile, command, code\n"
+                + "Set sh = CreateObject(\"WScript.Shell\")\n"
+                + "Set env = sh.Environment(\"Process\")\n"
+                + "Set fso = CreateObject(\"Scripting.FileSystemObject\")\n"
+                + "root = fso.GetParentFolderName(WScript.ScriptFullName)\n"
+                + "runFile = fso.BuildPath(root, \"" + LAUNCHER + "\")\n"
+                + "env(\"BCU_FEATURES_HIDDEN\") = \"1\"\n"
+                + "command = \"cmd.exe /d /s /c \" & Chr(34) & Chr(34) & runFile & Chr(34) & Chr(34)\n"
+                + "code = sh.Run(command, 0, True)\n"
+                + "If code <> 0 Then MsgBox \"BCU New Features exited with code \" & code, "
+                + "vbExclamation, \"BCU New Features\"\n"
+                + "WScript.Quit code\n";
     }
 
     private static File installerDir() {

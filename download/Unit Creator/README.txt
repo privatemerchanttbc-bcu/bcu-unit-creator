@@ -19,6 +19,24 @@ Use that launcher whenever you want Unit Creator. Start BCU the
 normal way and you get plain BCU, unchanged.
 
 
+USING IT WITH OTHER BCU PATCHES
+-------------------------------
+
+Some BCU patches share one launcher, "BCU New Features.bat",
+which starts BCU with every registered feature at once.
+
+To join it, run
+
+    Add to BCU New Features.bat
+
+From then on start BCU with "BCU New Features.bat" instead of
+the launcher in this folder. Your BCU jar is still not modified.
+If the shared launcher is not there yet, it gets created.
+
+"Remove from BCU New Features.bat" takes Unit Creator back out
+and leaves every other registered feature alone.
+
+
 IF YOU WANT THE BUTTON PERMANENTLY
 ----------------------------------
 
