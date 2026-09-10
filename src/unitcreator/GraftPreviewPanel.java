@@ -302,6 +302,7 @@ final class GraftPreviewPanel extends JPanel {
         private static final Color NEAR_C = new Color(10, 10, 10);
         private static final Color FAR_C = new Color(120, 120, 120);
         private static final long SLOW_TICK_MS = 120;
+        private static final int MAX_SKIP = 30;
 
         java.util.function.Consumer<Float> onZoomChange;
         GraftPreviewPanel owner;
@@ -320,6 +321,8 @@ final class GraftPreviewPanel extends JPanel {
         private boolean drawFailed;
         private boolean loadFailed;
         private long slowLogged;
+        private long lastSig = Long.MIN_VALUE;
+        private int skipRun;
         private int cw, ch;
         private float zoom = 1f, panX = 0, panY = 0;
         private Point drag;
@@ -466,10 +469,60 @@ final class GraftPreviewPanel extends JPanel {
             }
         }
 
+        private long signature() {
+            long h = 1125899906842597L;
+            h = h * 31 + cw;
+            h = h * 31 + ch;
+            h = h * 31 + Float.floatToIntBits(zoom);
+            h = h * 31 + Float.floatToIntBits(panX);
+            h = h * 31 + Float.floatToIntBits(panY);
+            h = h * 31 + (showRange ? 1 : 0);
+            h = h * 31 + rangeSel;
+            h = h * 31 + (type == null ? 0 : type.ordinal());
+            h = sideSig(h, left);
+            h = sideSig(h, right);
+            if (rangeSrc != null) {
+                try {
+                    int n = rangeSrc.count();
+                    h = h * 31 + n;
+                    for (int i = 0; i < n; i++) {
+                        int[] v = rangeSrc.get(i);
+                        if (v == null) { h = h * 31; continue; }
+                        for (int j = 0; j < v.length; j++) h = h * 31 + v[j];
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            return h;
+        }
+
+        private static long sideSig(long h, Side s) {
+            h = h * 31 + System.identityHashCode(s.anim);
+            h = h * 31 + Float.floatToIntBits(s.frame);
+            h = h * 31 + s.hiRoot;
+            h = h * 31 + (s.haveBox ? 1 : 0);
+            h = h * 31 + Float.floatToIntBits(s.bxMin);
+            h = h * 31 + Float.floatToIntBits(s.bxMax);
+            h = h * 31 + Float.floatToIntBits(s.byMin);
+            h = h * 31 + Float.floatToIntBits(s.byMax);
+            if (s.hi == null) return h * 31;
+            h = h * 31 + s.hi.length;
+            for (int i = 0; i < s.hi.length; i++) if (s.hi[i]) h = h * 31 + i;
+            return h;
+        }
+
         void tick() {
             if (!onScreen()) return;
             ensureCanvas();
             if (canvas == null || bimg == null) { repaint(); return; }
+            if (paused) {
+                long sig = signature();
+                if (sig == lastSig && skipRun < MAX_SKIP) { skipRun++; return; }
+                lastSig = sig;
+            } else {
+                lastSig = Long.MIN_VALUE;
+            }
+            skipRun = 0;
             long t0 = System.nanoTime();
             try {
                 ensureBg(cw, ch);
