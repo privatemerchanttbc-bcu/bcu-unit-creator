@@ -9,11 +9,13 @@ import javax.swing.JScrollPane;
 import javax.swing.JTree;
 import javax.swing.TransferHandler;
 import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
@@ -21,6 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 final class PartTree extends JPanel {
+
+    private static final float ROW_FONT = 11f;
 
     static final DataFlavor FLAVOR = new DataFlavor(PartRef.class, "BCU animation part");
 
@@ -66,6 +70,7 @@ final class PartTree extends JPanel {
         };
         tree.setRootVisible(true);
         tree.setShowsRootHandles(true);
+        applyRowFont(tree);
         tree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
         tree.addTreeSelectionListener(e -> {
             if (adjusting || selectListener == null) return;
@@ -89,6 +94,20 @@ final class PartTree extends JPanel {
     public void removeNotify() {
         LIVE.remove(this);
         super.removeNotify();
+    }
+
+    private static void applyRowFont(JTree t) {
+        try {
+            Font base = t.getFont();
+            if (base == null) base = new Font(Font.SANS_SERIF, Font.PLAIN, 12);
+            Font small = base.deriveFont(Font.PLAIN, ROW_FONT);
+            t.setFont(small);
+            DefaultTreeCellRenderer r = new DefaultTreeCellRenderer();
+            r.setFont(small);
+            t.setCellRenderer(r);
+            t.setRowHeight(0);
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void setEnglishAll(boolean b) {

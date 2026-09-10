@@ -22,6 +22,11 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Frame;
+import java.awt.GraphicsEnvironment;
+import java.awt.Rectangle;
+import java.awt.Window;
+import javax.swing.SwingUtilities;
 import java.awt.Graphics;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
@@ -30,6 +35,77 @@ import java.awt.image.BufferedImage;
 public final class UnitGraftDialog {
 
     private static final int UNDO_DEPTH = 10;
+    private static final int SIDE_FLOOR = 120;
+    private static final int SIDE_MIN = 340;
+    private static final int SIDE_MAX = 760;
+    private static final int PREVIEW_MIN = 420;
+    private static final float SIDE_FRAC = 0.27f;
+
+    private static int sideWidth(int rowWidth) {
+        if (rowWidth <= 0) return SIDE_MIN;
+        int side = Math.round(rowWidth * SIDE_FRAC);
+        if (side > SIDE_MAX) side = SIDE_MAX;
+        if (side < SIDE_MIN) side = SIDE_MIN;
+        int room = (rowWidth - PREVIEW_MIN) / 2;
+        if (side > room) side = room;
+        if (side < SIDE_FLOOR) side = SIDE_FLOOR;
+        int hard = (rowWidth - 60) / 2;
+        if (hard < 1) hard = 1;
+        if (side > hard) side = hard;
+        return side;
+    }
+
+    private static Rectangle usableScreen() {
+        try {
+            Rectangle r = GraphicsEnvironment.getLocalGraphicsEnvironment()
+                    .getMaximumWindowBounds();
+            if (r != null && r.width > 200 && r.height > 200) return r;
+        } catch (Throwable ignored) {
+        }
+        return new Rectangle(0, 0, 1500, 900);
+    }
+
+    private static Dimension startSize() {
+        Rectangle r = usableScreen();
+        int w = Math.min(Math.max(1200, Math.round(r.width * 0.86f)), r.width);
+        int h = Math.min(Math.max(760, Math.round(r.height * 0.88f)), r.height);
+        return new Dimension(w, h);
+    }
+
+    private static Window ownerWindow(Component parent) {
+        try {
+            return parent == null ? null : SwingUtilities.getWindowAncestor(parent);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static void matchOwner(JFrame frame, Component parent) {
+        Rectangle scr = usableScreen();
+        Dimension fallback = startSize();
+        Window w = ownerWindow(parent);
+        boolean big = false;
+        if (w instanceof Frame) {
+            int st = ((Frame) w).getExtendedState();
+            big = (st & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH;
+        }
+        Rectangle b = null;
+        if (w != null && !big) {
+            try { b = w.getBounds(); } catch (Throwable ignored) {}
+            if (b != null && (b.width < 900 || b.height < 600)) b = null;
+        }
+        if (b != null) {
+            int cw = Math.min(b.width, scr.width);
+            int chh = Math.min(b.height, scr.height);
+            int cx = Math.max(scr.x, Math.min(b.x, scr.x + scr.width - cw));
+            int cy = Math.max(scr.y, Math.min(b.y, scr.y + scr.height - chh));
+            frame.setBounds(cx, cy, cw, chh);
+        } else {
+            frame.setSize(fallback);
+            frame.setLocationRelativeTo(parent);
+        }
+        if (big) frame.setExtendedState(frame.getExtendedState() | JFrame.MAXIMIZED_BOTH);
+    }
 
     private UnitGraftDialog() {}
 
@@ -71,16 +147,26 @@ public final class UnitGraftDialog {
 
         UI(Component parent) {
             frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-            frame.setSize(1500, 900);
-            frame.setLocationRelativeTo(parent);
+            frame.setMinimumSize(new Dimension(960, 620));
+            matchOwner(frame, parent);
 
             slotA.tree.enableDropTarget();
             slotB.tree.enableDragSource();
 
-            JPanel row = new JPanel(new BorderLayout(12, 0));
+            JPanel row = new JPanel(new BorderLayout(12, 0)) {
+                @Override
+                public void doLayout() {
+                    int side = sideWidth(getWidth());
+                    if (slotA.getPreferredSize().width != side) {
+                        slotA.setPreferredSize(new Dimension(side, 0));
+                        slotB.setPreferredSize(new Dimension(side, 0));
+                    }
+                    super.doLayout();
+                }
+            };
             row.setBorder(BorderFactory.createEmptyBorder(12, 12, 8, 12));
-            slotA.setPreferredSize(new Dimension(300, 0));
-            slotB.setPreferredSize(new Dimension(300, 0));
+            slotA.setPreferredSize(new Dimension(SIDE_MIN, 0));
+            slotB.setPreferredSize(new Dimension(SIDE_MIN, 0));
             row.add(slotA, BorderLayout.WEST);
             row.add(slotB, BorderLayout.EAST);
 
