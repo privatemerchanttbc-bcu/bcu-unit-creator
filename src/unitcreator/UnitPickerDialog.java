@@ -178,8 +178,10 @@ final class UnitPickerDialog {
         ArrayList<Donor> out = new ArrayList<Donor>();
         Set<String> seen = new HashSet<String>();
         try {
+            int hidden = 0;
             for (PackData pack : UserProfile.getAllPacks()) {
                 if (pack == null || pack.units == null) continue;
+                if (!PackGate.allows(pack)) { hidden++; continue; }
                 List<Unit> units;
                 try { units = pack.units.getList(); } catch (Throwable t) { continue; }
                 if (units == null) continue;
@@ -191,6 +193,8 @@ final class UnitPickerDialog {
                     }
                 }
             }
+            if (hidden > 0)
+                Logger.log("UnitCreator: left out " + hidden + " protected pack(s) from the unit list");
         } catch (Throwable t) {
             Logger.err("UnitCreator: unit enumeration failed", t);
         }
@@ -201,8 +205,10 @@ final class UnitPickerDialog {
         ArrayList<Donor> out = new ArrayList<Donor>();
         Set<String> seen = new HashSet<String>();
         try {
+            int hidden = 0;
             for (PackData pack : UserProfile.getAllPacks()) {
                 if (pack == null || pack.enemies == null) continue;
+                if (!PackGate.allows(pack)) { hidden++; continue; }
                 List<Enemy> es;
                 try { es = pack.enemies.getList(); } catch (Throwable t) { continue; }
                 if (es == null) continue;
@@ -212,6 +218,8 @@ final class UnitPickerDialog {
                     out.add(Donor.of(e));
                 }
             }
+            if (hidden > 0)
+                Logger.log("UnitCreator: left out " + hidden + " protected pack(s) from the enemy list");
         } catch (Throwable t) {
             Logger.err("UnitCreator: enemy enumeration failed", t);
         }

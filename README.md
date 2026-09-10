@@ -16,6 +16,9 @@ Adds one "Unit Creator" button to the BCU main menu.
   keep the original names.
 - On save you choose whether the new unit takes the combined stats of every unit that went
   into it. That list is stored, so you can rebuild the stats later.
+- Packs you have not unlocked are left out. A pack that carries a password, or whose author
+  did not allow its animations to be reused, does not appear in either list. This is the
+  same permission BCU itself checks before it lets you copy an animation.
 
 ## Install
 
